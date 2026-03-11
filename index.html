@@ -1,0 +1,1088 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Comprobantes de Pago · Monte Carlo / Jaco Beach</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Poppins', sans-serif; background: #f5f0eb; min-height: 100vh; }
+    #root { min-height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+
+    // ── Storage polyfill (localStorage) para GitHub Pages ──────────────────────
+    if (!window.storage) {
+      const PREFIX = "mc_payroll_";
+      window.storage = {
+        set: async (key, value) => { try { localStorage.setItem(PREFIX+key, value); return {key,value}; } catch(e) { return null; } },
+        get: async (key) => { try { const v = localStorage.getItem(PREFIX+key); return v !== null ? {key, value:v} : null; } catch(e) { return null; } },
+        delete: async (key) => { try { localStorage.removeItem(PREFIX+key); return {key, deleted:true}; } catch(e) { return null; } },
+        list: async (prefix) => {
+          try {
+            const keys = [];
+            for (let i = 0; i < localStorage.length; i++) {
+              const k = localStorage.key(i);
+              if (k && k.startsWith(PREFIX+prefix)) keys.push(k.slice(PREFIX.length));
+            }
+            return { keys };
+          } catch(e) { return { keys: [] }; }
+        }
+      };
+    }
+
+    const { useState, useEffect } = React;
+    const XLSX = window.XLSX;
+
+
+const LOGO_SRC = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAkGBwgHBgkIBwgKCgkLDRYPDQwMDRsUFRAWIB0iIiAdHx8kKDQsJCYxJx8fLT0tMTU3Ojo6Iys/RD84QzQ5Ojf/2wBDAQoKCg0MDRoPDxo3JR8lNzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzf/wAARCABaAKADASIAAhEBAxEB/8QAGwABAQADAQEBAAAAAAAAAAAAAAUDBAYBAgf/xAA+EAABAwMCBAQEAwYCCwAAAAABAgMEAAUREiEGEzFBIlFhcRQygZEHQqEVFlJyscEXQyMkMzU3k6Kz0eHx/8QAGQEBAAMBAQAAAAAAAAAAAAAAAAEDBAIF/8QAJxEAAgICAQIGAgMAAAAAAAAAAAECEQMhEgQTMUFRYXGBMkKhscH/2gAMAwEAAhEDEQA/AP3GlKUApSlAKUpQClKUApSlAKUpQClK8CgSQCMjqKA9pSlAKUpQClKUApSlAKUpQClKUApSlAKUoaAlXKbKVJEC1pbVKKNbjjvyMpOwJ8yd8D0qTOb4mtrZmNz25qUeJxkshO3fA/8Aea2WZDcPiS4R5qg2JiW1sLUcBQCcFIPnWlNfi22/25u0ODXIc0SWG16kqSehI7HrXnZZJpycmt1p1W6WvP1NEE06SMUnid+8NRINnCmpkk4dUf8AKA64P658vWrkcW3h2Glt+Shsq3W46rxuq7k9zXHWtaLTxDdZCAC1EQ9gdj4gEj7kCqHCtu/arz17vB5uFHl8z5cjqfYdB2rP0/UZJS3ubteyS8/styY4pa1H+7OyhzGJrIdjOcxs9FAEZ+9Z65K5cZstvfDWmOZbmcBW+kn0A3NZIdz4ocUFO2Zktn8pXy1fqT/Sty6zG3xW37J0Z3hlVvXydTSscda3GkqcaU0ojdCiCQfptWStadlQpSlAKUqDxfxA9w3bhPRbHp7KVBLgZcSlSMkAbHrkntQF6lR2uIYb3C6OIGtSoq4vxCUj5jtnT/Nnb3qZZONos/hV7iWfGXbrc2FEKdcC1KCVFJ2T0OoYA6mgOrpXLyOKpkG3i63KxSI9sAC3HOclbzKD+dbY6AZyQCSPKsfEXG8bh6Xb1TojirVOUlKLk04lTaMjOVDqBjBz5UB1lKgX2/y7ZMgMxrS5NbnOBpt5uQhICyFKwQe2lJOajOcfSW4dvlr4ekJYuE1MOKVyWwVrJIBI7JOk70B3FK4q58dSbXBukqbw/JR+y1tiQgSGz4FjwrSeihnbzqkniC4tzLe1LsTzbE10NiQ3IQ4lslJUNQG4Bx1oC1OgxZ7PKmMNvIznCxnHt5VztzesvC6FqgxWROUnDaE7qGe5J6D+tWOI7nCtFnfmXJ5xqOgAEtZ1qJOAlONyonYYriprMaCIsm68MTWmJkhtkOCcHFtrcUEpLozt16gq32rL1GOct4kuXq/L+C3HKK/JuvQ0YUdc1tSXHgzHW5zZktzYE7kJT5ncnHmfSqE+dJvKW7TYIrogNAJ2GNfqo9h79a2+KYvDHDTUFy4MOlMqWiMjD6vBqO6zv0Hes/E1ptfD9jk3JFvkyGo6S4823LKCEAbnc4OPKvOj0GdR4634738eGjQ+oxt2ZrWxbOE4xXcJLapro8WgalAfwpHXHr3r7Vx1bQrCY0pQ89KR/eueacsjUi0pu1jlw2buUpiSBLDqCtQBSleDlJIPkRWe4xrbD4qiWFNgkOrloLjT4mgJ0JxrJBORjPTvWjtdXBKOJRil9/4V88Mnc7bOmg8X2iWoILymFHoHk6R9+lXUrStIUkggjIIOQa5K+WbhixWx64XFp1DDQGdLilKUScBKRnck4AFa8e5/uvETNn2WVAtayA44ZgeMbJwFON/lGSASknFacD6laypfRXPt/pZ29K8QpK0hSSCkjIIOQRXtaioVC4xWlFpZKyMfHwxv0P8ArDdXajX+2W66PQmLpAjy21LVgPDIRhJOQPpUNpeIOL4XjPxrxN4LU2v4O2zzPQrHhMZXjab/AOYf+k1zrUd538CLa82hS2os74iSlIyS0mQvVt3A6/Sv1OTFhaJENMOOpoxG8kkjWgKOlJI3IG+PeviHBgWF0QLbb4kaPJxs34Uau4I6DIzjzO1cvJFE0xxhPhtcFXWY66hUVcFwpVnIcC0EJA88kgD3rmbRaimw8E2e9tBRcjvNPMOdwWFeAj0G30q8zYbMxOXyLXGHwrramkKUotoKvzJbzpSR2wK9uVvtVyvzfx9rjyH2lBLb7mdSBp1ZB7H0G569qPJFCmcnbnJth4jsvB1yU4+yzOMi1S1DPMjhp0FtR/iQSB7Y9Ks/igMHhMAbDiKL2/mrpNDc25NiVDZU9BcLjTh3KNSSApJ8yCoEentWpfbTa7tPQ3OtkWW80zzUKk9Bg4GPI+vbanNVYpk38XgP8OL5gb8lP/cTX1GbkWKeLxdrs5JguxGIrKVoSlSXVOAAJSkAHOob9dvKt28RLbNiORZ9uYlQ4XLHJdOc5Axgd8bdeprWfstkjTGm1WaIeQ62Yq1ZKULyMYB+UjqPancihxZO/F4ONWuyz1BRhQLxHkTABnDYJGo+gJH3rrblKtwt6Xpqm3Yrimyjw6w4oqBRpA+Yk4IxWKbNGuTHfjtusJLaFpVvrDm2MEYPt3qRDsljtj63YVoYbQ3I5AGpRKCrAJQknCfm7Y2zUdyI4smcS22Xxc/eo0aNFfiNxzb23HpJRy3jha1ABCs4UGx1G6CK1nbw7evwYuj0sETmID8aWk9UvNgpVn1OAfrXQMRrZY/j48C1x2NeMholIdSSAon1GrfzyK9TwvYEPS4KLLCSy60l11IScOnJHiHfp1NSskW6HFnHxObGvXCX72OpftaozSrS6hHLbalaB4XRvlWPlOcenWr96/4r8Ndf93y/7VTjW21Tbb+x37TE+EbQHDEcGpCTnwlOfy+RHqKwpsVkkrtcly0RC883hDhJKmgEZASevpRZIscWQ/xWmsviA224Vps9zhzbigDZtlSlAFX1GceW9XvxKkx2+AbyXCFB6KppoDfWtfhQE+ZJI6VmiwrZaGuaxbIjTc/AmKQM6h0BVn5h4sb+da8O0WqI0zNj2doOsvqQy3qU4GMEjKEE4B26JGRUd2N0OLK3CkWRC4ZtMSbn4lmG027nsoIAIqrWKK6H47To04WgK8JyNx2rLXad7IFY3WWnsc1tC8dNSQcVkpUghzb1bIj8huSysKiAAEM6gfCF4SfMDfHpXq7zaVLUl9BCi6pB5jB3KFhGTt0ClJAPrVZyOy4FBxptYV8wUkHO2N/ptWI22EZCJBiM85GdK9AyM4/Xwjf0FRSBoyrrEafURGW66hCMEJAVrWrCEb75O59BuetYhxBw+4tw/EslSSFOktnwYwMqONsE4JPQ7HFU0wYbagtLDSSlzmAhIGFadOffG3tX2Y8Y6gWmjrBSrwDfJyQfPJpSBJTxNYEgSPi20BzCS4pBTk7bE46jUMg/KOuMGss682pltt6WRoLPOQpTeSE5HbrncbVRVHjKGFNNEEq2KQck7K+++axuQYTjxfdYaWvTpKlJB2znp08vsKUgaDl9s+A+pesAkJcDROdIKlY2/KASfKvDfrNrWorABOVOllWk4JAJOPNJHuKpKhw1atUZg5IKstp3IG2du1ZOUwd9DZyeukb9/wDzSkCUL3aOeDkh9SkhWWTqTnSE5ONs60Y/mrG3xHZXCh0qKXFNJd8TKtSQoZTnbYkHaq7cWM0gJbYaQkdAlAAG+f618phwwMJjsY0lOA2PlPbp0pSBNevNmRJXFdxz1aSposkqUVKSkDGOuVI+4r2Be7XOdRoGl10lrxo7gKOknp0STjyqkiNEQdTbLCTtulAHTp/QfanwsTXq5DOvTpzoGcHt7UpAnC92hDaSlWG1JUEkNHGhKgknp8oUoD617EutpmLZisjIURykqYISfCVDGRjcJUR7GqHwkMrB+HY1a9Y8Cc6v4vf1rIlhpJBS2gEdMJG3b+5pSAUy0opKm0EpGEkpG3tXnwzGnTyW9OrVjSMZ8/estKUgeABIAAAA6AV7SlSBSlKAUpSgNafDbnR+S6VJGoKBT1BByMVoR+HokeSiQ29JC05/zevvt+vU9yasUoCMrhyIt1bi3pJUvXrw5p1BXUbAe23Yb5r7bsMdpp5tt6QkOtIaJ1jZKU6R2wTg9SDValASGeHobDyXWlOpUlaVgZBHhSoAYI6YUc+f0rZj2tiPyA2VaWEKShJ33V8yj5k7/c+db1KAkuWCK5EjRlvSSiOQWyHMYIz2G3fyrHF4ahRkKQ27JwptTf8AtcHCsZ3G/Ye31NWqUBEPDUVQTqkSiUJSlJ1gFIBJ7D1/QYxissuwRJbji3Vv/wCkKSoJcxuNs565xtn7VWpQE6HZosR5LrfMUpCnFJ1q1YKzlRz1/wDp86o0pQClKUApSlAf/9k=";
+
+
+// ─── Storage helpers ───────────────────────────────────────────────────────────
+async function saveRecord(key_prefix, record) {
+  const safeId = (record.nombre || "x").replace(/[\s\/\\'"]/g, "_");
+  const key = `payroll:${key_prefix}:${record.quincena}:${safeId}`;
+  try { await window.storage.set(key, JSON.stringify(record), false); return true; }
+  catch (e) { console.error("saveRecord error:", e); return false; }
+}
+async function loadAllRecords(prefix) {
+  try {
+    const result = await window.storage.list(`payroll:${prefix}:`);
+    if (!result) return [];
+    const records = [];
+    for (const key of result.keys) {
+      try { const item = await window.storage.get(key); if (item) records.push(JSON.parse(item.value)); } catch {}
+    }
+    return records.sort((a, b) => b.quincena.localeCompare(a.quincena));
+  } catch { return []; }
+}
+async function deleteRecord(prefix, quincena, id) {
+  const safeId = (id || "x").replace(/[\s\/\\'"]/g, "_");
+  const key = `payroll:${prefix}:${quincena}:${safeId}`;
+  try { await window.storage.delete(key); } catch {}
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+const fmt = (n) => "₡" + Number(n || 0).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const QUINCENAS = (() => {
+  const list = [];
+
+  const now = new Date();
+  const months = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SETIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
+  for (let i = 0; i < 24; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const y = d.getFullYear(); const m = String(d.getMonth()+1).padStart(2,"0"); const mn = months[d.getMonth()];
+    list.push({ value: `${y}-${m}-II`, label: `II SEGUNDA QUINCENA ${mn} ${y}` });
+    list.push({ value: `${y}-${m}-I`,  label: `I PRIMERA QUINCENA ${mn} ${y}` });
+  }
+  return list;
+})();
+
+// ─── Listas de empleados por empresa ──────────────────────────────────────────
+const EMPLEADOS_JACO = [
+  { nombre: "KAREN ENRIQUEZ CRUZ" },
+  { nombre: "MARIA BEATRIZ RODRIGUEZ" },
+  { nombre: "PAULA URBINA" },
+  { nombre: "ALVARO SALAS PICADO" },
+  { nombre: "MARIA MERCEDES TORREZ GONZALEZ" },
+  { nombre: "ELSA GUDIEL" },
+  { nombre: "GRISELDA ROBLES" },
+];
+
+const EMPLEADOS_MONTECARLO = [
+  { nombre: "HAROLD VALVERDE" },
+  { nombre: "ARLIS MEJIAS RAMIREZ" },
+  { nombre: "NELSON RAMON ICABALZETA" },
+  { nombre: "MARTIN DE LOS SANTOS" },
+  { nombre: "MARLON GRANADOS" },
+  { nombre: "MARIO A MEJIA ULATE" },
+  { nombre: "CRISTIAN CHAVARRIA" },
+];
+
+const fmtDate = () => {
+  const d = new Date();
+  const days = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
+  const months = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","setiembre","octubre","noviembre","diciembre"];
+  return `${days[d.getDay()]}, ${d.getDate()} de ${months[d.getMonth()]} de ${d.getFullYear()}`;
+};
+
+// ─── SLIP TYPES ────────────────────────────────────────────────────────────────
+// Type A: Jaco Oficina  (cyan highlight on name, Rentas + Tours comisiones)
+// Type B: Jaco Otros    (blue highlight on name, Dias Laborados + Pendientes)
+// Type C: Monte Carlo   (green highlight on name, Horas Extra + Dias Dobles)
+
+const SLIP_TYPES = {
+  jaco_oficina: {
+    id: "jaco_oficina", label: "Oficina", prefix: "jaco",
+    nameColor: "#00e5ff",
+    fields: [
+      { key: "salarioMensual",      label: "Salario Bruto Mensual",   type: "number" },
+      { key: "rentas",              label: "Comisiones de Rentas (₡)", type: "number", default: 0 },
+      { key: "toursTransfers",      label: "Comisiones Tours y Transfer (₡)", type: "number", default: 0 },
+      { key: "diasDoblesPagados",   label: "Día Dobles Pagados (₡)",  type: "number", default: 0 },
+      { key: "rebajoImpuestos",     label: "Rebajo por Impuestos (₡)", type: "number", default: 0 },
+    ],
+    calcNet: (f) => {
+      const brutoMensual = f.salarioMensual || 0;
+      const brutoQuincenal = brutoMensual / 2;
+      const comisiones = (f.rentas || 0) + (f.toursTransfers || 0);
+      const montoFinalConComisiones = brutoQuincenal + comisiones;
+      const diasDobles = f.diasDoblesPagados || 0;
+      const totalConDobles = montoFinalConComisiones + diasDobles;
+      const cargasSociales = totalConDobles * 0.1083;
+      const impuestos = f.rebajoImpuestos || 0;
+      const neto = totalConDobles - cargasSociales - impuestos;
+      return { brutoMensual, brutoQuincenal, comisiones, montoFinalConComisiones, diasDobles, totalConDobles, cargasSociales, impuestos, neto };
+    }
+  },
+  jaco_otros: {
+    id: "jaco_otros", label: "Otros Puestos", prefix: "jaco",
+    nameColor: "#90caf9",
+    fields: [
+      { key: "salarioMensual",      label: "Salario Bruto Mensual (₡)", type: "number" },
+      { key: "diasLaborados",       label: "Días Laborados",            type: "number", default: 15 },
+      { key: "diasPendientes",      label: "Días Pendientes (₡)",       type: "number", default: 0 },
+      { key: "diasDoblesPagados",   label: "Días Dobles Pagados (₡)",   type: "number", default: 0 },
+    ],
+    calcNet: (f) => {
+      const brutoMensual = f.salarioMensual || 0;
+      const brutoQuincenal = brutoMensual / 2;
+      const diasDobles = f.diasDoblesPagados || 0;
+      const diasPendientes = f.diasPendientes || 0;
+      const montoFinal = brutoQuincenal + diasDobles + diasPendientes;
+      const cargasSociales = montoFinal * 0.1083;
+      const neto = montoFinal - cargasSociales;
+      return { brutoMensual, brutoQuincenal, diasDobles, diasPendientes, montoFinal, cargasSociales, neto };
+    }
+  },
+  montecarlo: {
+    id: "montecarlo", label: "Monte Carlo", prefix: "montecarlo",
+    nameColor: "#a5d6a7",
+    fields: [
+      { key: "salarioMensual",      label: "Salario Bruto Mensual (₡)", type: "number" },
+      { key: "horasExtra",          label: "Horas Extra (₡)",           type: "number", default: 0 },
+      { key: "diasDoblesTrabajados",label: "Días Dobles Trabajados (₡)",type: "number", default: 0 },
+      { key: "diasLibrePendiente",  label: "Días Libre Pendiente (₡)",  type: "number", default: 0 },
+    ],
+    calcNet: (f) => {
+      const brutoMensual = f.salarioMensual || 0;
+      const brutoQuincenal = brutoMensual / 2;
+      const horasExtra = f.horasExtra || 0;
+      const diasDobles = f.diasDoblesTrabajados || 0;
+      const diasLibre = f.diasLibrePendiente || 0;
+      const montoFinalConExtras = brutoQuincenal + horasExtra + diasDobles + diasLibre;
+      const cargasSociales = montoFinalConExtras * 0.1083;
+      const neto = montoFinalConExtras - cargasSociales;
+      return { brutoMensual, brutoQuincenal, horasExtra, diasDobles, diasLibre, montoFinalConExtras, cargasSociales, neto };
+    }
+  }
+};
+
+// ─── Build Slip HTML ─────────────────────────────────────────────────────────────
+function buildSlipHTML(record, slipType) {
+  const st = SLIP_TYPES[slipType];
+  const calc = st.calcNet(record);
+  const quincenaLabel = QUINCENAS.find(q => q.value === record.quincena)?.label || record.quincena;
+  const fechaStr = record.fechaPago || fmtDate();
+
+  const LOGO = LOGO_SRC;
+
+  // ── helpers ──────────────────────────────────────────────────────────────────
+  const noZero = v => (parseFloat(v) || 0) === 0 ? "—" : fmt(v);
+
+  // ── detalles de ingreso / deducción por tipo ─────────────────────────────────
+  let ingresos = "";
+  let deducciones = "";
+  let resumen = "";
+
+  const ING = (label, val, note="") => `
+    <tr>
+      <td class="c-label">${label}</td>
+      <td class="c-note">${note}</td>
+      <td class="c-val">${val}</td>
+    </tr>`;
+  const DED = (label, val, pct="") => `
+    <tr>
+      <td class="c-label">${label}</td>
+      <td class="c-note" style="color:#8b2020;">${pct}</td>
+      <td class="c-val" style="color:#8b2020;">- ${val}</td>
+    </tr>`;
+
+  if (slipType === "jaco_oficina") {
+    ingresos = `
+      ${ING("Salario bruto mensual",     fmt(calc.brutoMensual))}
+      ${ING("Salario bruto quincenal",   fmt(calc.brutoQuincenal), "(50% del mensual)")}
+      ${ING("Comisiones de rentas",      noZero(record.rentas))}
+      ${ING("Comisiones tours y transfer", noZero(record.toursTransfers))}
+      ${ING("Días dobles pagados",       noZero(calc.diasDobles))}`;
+    deducciones = `
+      ${DED("Cargas sociales (CCSS)",    fmt(calc.cargasSociales), "10.83 %")}
+      ${DED("Impuesto sobre la renta",   fmt(calc.impuestos))}`;
+    resumen = `
+      <tr class="row-subtotal">
+        <td colspan="2">Subtotal ingresos quincenales</td>
+        <td>${fmt(calc.totalConDobles)}</td>
+      </tr>
+      <tr class="row-subtotal">
+        <td colspan="2">Total deducciones</td>
+        <td style="color:#8b2020;">- ${fmt(calc.cargasSociales + calc.impuestos)}</td>
+      </tr>`;
+  } else if (slipType === "jaco_otros") {
+    ingresos = `
+      ${ING("Salario bruto mensual",     fmt(calc.brutoMensual))}
+      ${ING("Salario bruto quincenal",   fmt(calc.brutoQuincenal), "(50% del mensual)")}
+      ${ING("Días laborados",            record.diasLaborados || 15, "(días)")}
+      ${ING("Días pendientes",           noZero(calc.diasPendientes))}
+      ${ING("Días dobles pagados",       noZero(calc.diasDobles))}`;
+    deducciones = `
+      ${DED("Cargas sociales (CCSS)",    fmt(calc.cargasSociales), "10.83 %")}`;
+    resumen = `
+      <tr class="row-subtotal">
+        <td colspan="2">Subtotal ingresos quincenales</td>
+        <td>${fmt(calc.montoFinal)}</td>
+      </tr>
+      <tr class="row-subtotal">
+        <td colspan="2">Total deducciones</td>
+        <td style="color:#8b2020;">- ${fmt(calc.cargasSociales)}</td>
+      </tr>`;
+  } else {
+    ingresos = `
+      ${ING("Salario bruto mensual",     fmt(calc.brutoMensual))}
+      ${ING("Salario bruto quincenal",   fmt(calc.brutoQuincenal), "(50% del mensual)")}
+      ${ING("Horas extra",               noZero(calc.horasExtra))}
+      ${ING("Días dobles trabajados",    noZero(calc.diasDobles))}
+      ${ING("Días libre pendiente",      noZero(calc.diasLibre))}`;
+    deducciones = `
+      ${DED("Cargas sociales (CCSS)",    fmt(calc.cargasSociales), "10.83 %")}`;
+    resumen = `
+      <tr class="row-subtotal">
+        <td colspan="2">Subtotal ingresos quincenales</td>
+        <td>${fmt(calc.montoFinalConExtras)}</td>
+      </tr>
+      <tr class="row-subtotal">
+        <td colspan="2">Total deducciones</td>
+        <td style="color:#8b2020;">- ${fmt(calc.cargasSociales)}</td>
+      </tr>`;
+  }
+
+  const empresa     = slipType === "montecarlo"
+    ? "Condominio Montecarlo"
+    : "Jaco Beach Onsite Management Services Ltda.";
+  const empresaSub  = "Jacó, Puntarenas, Costa Rica";
+  const tipoBadge   = slipType === "montecarlo" ? "Monte Carlo" : slipType === "jaco_oficina" ? "Área Administrativa" : "Personal Operativo";
+  const netoFinal   = slipType === "jaco_oficina" ? calc.neto
+                    : slipType === "jaco_otros"   ? calc.neto
+                    : calc.neto;
+
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+  <title>Comprobante de Pago – ${record.nombre}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+    @page { size: letter; margin: 18mm 16mm; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Poppins', sans-serif; background: #f0ebe3; color: #1a1a1a;
+           display: flex; justify-content: center; padding: 30px 20px; min-height: 100vh; }
+
+    /* ── CARD ── */
+    .card { background: #fff; width: 680px; border-radius: 0; overflow: hidden;
+            box-shadow: 0 6px 40px rgba(44,24,16,0.18); border-top: 6px solid #5c3d1e; }
+
+    /* ── HEADER ── */
+    .hdr { background: #2c1810; padding: 22px 32px; display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+    .hdr-logo { display: flex; flex-direction: column; gap: 6px; }
+    .hdr-logo img { max-height: 56px; max-width: 160px; object-fit: contain; }
+    .hdr-logo .co-name { font-size: 10px; color: rgba(255,255,255,0.55); letter-spacing: 0.5px; font-weight: 500; margin-top: 2px; }
+    .hdr-right { text-align: right; }
+    .hdr-right .doc-label { font-size: 9px; color: #c8a06a; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; }
+    .hdr-right .doc-title { font-size: 18px; font-weight: 800; color: #fff; line-height: 1.1; margin-top: 2px; }
+    .hdr-right .doc-ref   { font-size: 9px; color: rgba(255,255,255,0.45); margin-top: 6px; letter-spacing: 0.4px; }
+
+    /* ── GOLD BAND ── */
+    .band { height: 4px; background: linear-gradient(90deg, #3d2008 0%, #c8a06a 40%, #e8c87a 60%, #c8a06a 80%, #3d2008 100%); }
+
+    /* ── PERIODO ── */
+    .periodo-bar { background: #f9f4ee; padding: 10px 32px; display: flex; gap: 32px; border-bottom: 1px solid #e0d4c4; }
+    .periodo-bar .pb-item { display: flex; flex-direction: column; }
+    .periodo-bar .pb-label { font-size: 8px; font-weight: 700; color: #999; letter-spacing: 1px; text-transform: uppercase; }
+    .periodo-bar .pb-val   { font-size: 11px; font-weight: 700; color: #2c1810; margin-top: 1px; }
+
+    /* ── EMPLEADO ── */
+    .emp-section { padding: 18px 32px; border-bottom: 2px solid #e8ddd0; display: flex; align-items: center; gap: 16px; }
+    .emp-avatar { width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #5c3d1e, #8b5e34);
+                  display: flex; align-items: center; justify-content: center;
+                  font-size: 20px; font-weight: 800; color: #fff; flex-shrink: 0;
+                  border: 3px solid #c8a06a; }
+    .emp-data { flex: 1; }
+    .emp-data .emp-name   { font-size: 16px; font-weight: 800; color: #1a1a1a; }
+    .emp-data .emp-sub    { display: flex; gap: 18px; margin-top: 5px; flex-wrap: wrap; }
+    .emp-data .emp-sub span { font-size: 10px; color: #777; font-weight: 500; }
+    .emp-data .emp-sub span strong { color: #3d2008; font-weight: 700; }
+    .emp-badge { background: #2c1810; color: #c8a06a; padding: 5px 14px; border-radius: 3px;
+                 font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+                 border: 1px solid #5c3d1e; white-space: nowrap; }
+
+    /* ── BODY ── */
+    .body-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+    .col { padding: 0; }
+    .col-left  { border-right: 1px solid #e8ddd0; }
+
+    /* ── SECTION TITLE ── */
+    .sec-title { background: #f9f4ee; padding: 8px 20px; font-size: 8.5px; font-weight: 800;
+                 color: #5c3d1e; letter-spacing: 1.8px; text-transform: uppercase;
+                 border-bottom: 1px solid #e0d4c4; display: flex; align-items: center; gap: 6px; }
+    .sec-title::before { content: ""; display: inline-block; width: 3px; height: 12px;
+                         background: #c8a06a; border-radius: 2px; }
+
+    /* ── TABLE ── */
+    table { width: 100%; border-collapse: collapse; }
+    .c-label { padding: 8px 20px 8px 20px; font-size: 10.5px; font-weight: 600; color: #444;
+               border-bottom: 1px solid #f0ebe3; width: 55%; }
+    .c-note  { padding: 8px 4px; font-size: 9px; color: #aaa; font-weight: 500;
+               border-bottom: 1px solid #f0ebe3; white-space: nowrap; }
+    .c-val   { padding: 8px 20px 8px 8px; font-size: 11px; font-weight: 700; color: #1a1a1a;
+               text-align: right; border-bottom: 1px solid #f0ebe3; }
+    tr:last-child td { border-bottom: none; }
+
+    /* ── SUBTOTALS ── */
+    .row-subtotal td { padding: 7px 20px; font-size: 10px; font-weight: 700; color: #555;
+                       background: #f9f4ee; border-bottom: 1px solid #e0d4c4; }
+    .row-subtotal td:last-child { text-align: right; }
+
+    /* ── NETO TOTAL ── */
+    .neto-box { margin: 0; padding: 14px 32px; background: linear-gradient(135deg, #2c1810 0%, #4a2a12 100%);
+                display: flex; justify-content: space-between; align-items: center; }
+    .neto-box .neto-label { color: #c8a06a; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; }
+    .neto-box .neto-sub   { color: rgba(255,255,255,0.5); font-size: 9px; margin-top: 2px; }
+    .neto-box .neto-amount { font-size: 22px; font-weight: 800; color: #fff; }
+
+    /* ── NOTA LEGAL ── */
+    .nota { padding: 8px 32px; background: #fdf9f5; border-top: 1px dashed #ddd;
+            font-size: 8px; color: #bbb; font-style: italic; line-height: 1.6; }
+
+    /* ── FOOTER ── */
+    .ftr { padding: 16px 32px 20px; background: #f9f4ee; border-top: 2px solid #e8ddd0;
+           display: flex; justify-content: space-between; align-items: flex-end; }
+    .sig { text-align: center; min-width: 180px; }
+    .sig-space { height: 32px; }
+    .sig-line  { width: 100%; height: 1px; background: #2c1810; margin-bottom: 5px; }
+    .sig-name  { font-size: 10px; font-weight: 700; color: #1a1a1a; text-transform: uppercase; letter-spacing: 0.5px; }
+    .sig-cargo { font-size: 9px; color: #888; margin-top: 2px; }
+    .ftr-right { text-align: right; font-size: 9px; color: #aaa; line-height: 2; }
+    .ftr-right strong { color: #666; font-weight: 700; display: block; font-size: 10px; margin-bottom: 4px; }
+
+    /* ── WATERMARK ── */
+    .watermark { position: fixed; bottom: 40px; right: 40px; font-size: 60px; opacity: 0.03;
+                 color: #2c1810; font-weight: 900; transform: rotate(-20deg); pointer-events: none;
+                 letter-spacing: -2px; }
+
+    @media print {
+      body { background: white; padding: 0; display: block; }
+      .card { box-shadow: none; width: 100%; border-top: 6px solid #5c3d1e; }
+      .watermark { display: block; }
+    }
+  </style></head><body>
+
+  <div class="card">
+
+    <!-- HEADER -->
+    <div class="hdr">
+      <div class="hdr-logo">
+        <img src="${LOGO_SRC}" alt="${empresa}" />
+        <span class="co-name">${empresa} &nbsp;·&nbsp; ${empresaSub}</span>
+      </div>
+      <div class="hdr-right">
+        <div class="doc-label">Documento oficial</div>
+        <div class="doc-title">Comprobante<br>de Pago</div>
+        <div class="doc-ref">Generado: ${fechaStr}</div>
+      </div>
+    </div>
+    <div class="band"></div>
+
+    <!-- PERIODO -->
+    <div class="periodo-bar">
+      <div class="pb-item">
+        <span class="pb-label">Período de Pago</span>
+        <span class="pb-val">${quincenaLabel}</span>
+      </div>
+      <div class="pb-item">
+        <span class="pb-label">Fecha de Pago</span>
+        <span class="pb-val">${fechaStr}</span>
+      </div>
+
+    </div>
+
+    <!-- EMPLEADO -->
+    <div class="emp-section">
+      <div class="emp-avatar">${(record.nombre||"?").charAt(0).toUpperCase()}</div>
+      <div class="emp-data">
+        <div class="emp-name">${record.nombre || "—"}</div>
+        <div class="emp-sub">
+          
+          <span><strong>Puesto:</strong> ${record.puesto || "—"}</span>
+          <span><strong>Empresa:</strong> ${empresa}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- BODY GRID -->
+    <div class="body-grid">
+      <div class="col col-left">
+        <div class="sec-title">Ingresos</div>
+        <table>${ingresos}</table>
+      </div>
+      <div class="col">
+        <div class="sec-title">Deducciones</div>
+        <table>${deducciones}${resumen}</table>
+      </div>
+    </div>
+
+    <!-- NETO -->
+    <div class="neto-box">
+      <div>
+        <div class="neto-label">Salario Neto a Recibir</div>
+        <div class="neto-sub">Período: ${quincenaLabel}</div>
+      </div>
+      <div class="neto-amount">${fmt(netoFinal)}</div>
+    </div>
+
+    <!-- NOTA -->
+    <div class="nota">
+      Este comprobante es un documento informativo generado por el sistema de planillas. Las cargas sociales corresponden al aporte obrero del 10.83%
+      conforme a la legislación de la Caja Costarricense del Seguro Social (CCSS). Conserve este documento para sus registros personales.
+    </div>
+
+    <!-- FOOTER -->
+    <div class="ftr">
+      <div class="sig">
+        <div class="sig-space"></div>
+        <div class="sig-line"></div>
+        <div class="sig-name">Cristian Chavarria Villalobos</div>
+        <div class="sig-cargo">Gerencia General</div>
+      </div>
+      <div class="ftr-right">
+        <strong>${empresa}</strong>
+        ${empresaSub}<br>
+        www.jacomontecarlo.com<br>
+        Tel: 506-2643-2917 &nbsp;|&nbsp; 1-480-626-5947
+      </div>
+    </div>
+
+  </div>
+  <div class="watermark">ORIGINAL</div>
+  <script>window.onload = () => window.print();</script>
+  </body></html>`;
+  return html;
+}
+
+function printSlip(record, slipType) {
+  const html = buildSlipHTML(record, slipType);
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.target = "_blank";
+  a.rel = "noopener";
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+// ─── Save Slip as HTML file ────────────────────────────────────────────────────
+function saveSlip(record, slipType) {
+  const html = buildSlipHTML(record, slipType);
+  const ql   = QUINCENAS.find(q => q.value === record.quincena)?.label || record.quincena;
+  const name = (record.nombre||"empleado").replace(/\s+/g,"-").replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ0-9-]/g,"");
+  const filename = `Comprobante_${name}_${record.quincena}.html`;
+  const blob = new Blob([html], { type:"text/html;charset=utf-8" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+}
+
+function saveAllSlips(records, slipType, filterQuincena) {
+  const toSave = filterQuincena ? records.filter(r => r.quincena === filterQuincena) : records;
+  if (toSave.length === 0) return;
+
+  const slipBodies = toSave.map(r => {
+    const fullHtml = buildSlipHTML(r, slipType);
+    const bodyMatch = fullHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    const bodyContent = bodyMatch ? bodyMatch[1] : fullHtml;
+    return bodyContent.replace(/<script[\s\S]*?<\/script>/gi, "");
+  });
+
+  const ql = filterQuincena
+    ? (QUINCENAS.find(q => q.value === filterQuincena)?.label || filterQuincena)
+    : "Todos";
+  const st = SLIP_TYPES[slipType];
+  const filename = `Planilla_${st.label.replace(/\s+/g,"_")}_${filterQuincena||"completa"}.html`;
+
+  const css = `
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+    @page { size: letter; margin: 12mm 14mm; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Poppins', sans-serif; background: #f0ebe3; color: #1a1a1a; }
+    .slip-wrapper { page-break-after: always; display: flex; justify-content: center; padding: 24px 16px; }
+    .slip-wrapper:last-child { page-break-after: avoid; }
+    .card { background: #fff; width: 680px; overflow: hidden; box-shadow: 0 6px 40px rgba(44,24,16,0.18); border-top: 6px solid #5c3d1e; }
+    .hdr { background: #2c1810; padding: 22px 32px; display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+    .hdr-logo { display: flex; flex-direction: column; gap: 6px; }
+    .hdr-logo img { max-height: 56px; max-width: 160px; object-fit: contain; }
+    .hdr-logo .co-name { font-size: 10px; color: rgba(255,255,255,0.55); letter-spacing: 0.5px; font-weight: 500; margin-top: 2px; }
+    .hdr-right { text-align: right; }
+    .hdr-right .doc-label { font-size: 9px; color: #c8a06a; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; }
+    .hdr-right .doc-title { font-size: 18px; font-weight: 800; color: #fff; line-height: 1.1; margin-top: 2px; }
+    .hdr-right .doc-ref   { font-size: 9px; color: rgba(255,255,255,0.45); margin-top: 6px; letter-spacing: 0.4px; }
+    .band { height: 4px; background: linear-gradient(90deg, #3d2008 0%, #c8a06a 40%, #e8c87a 60%, #c8a06a 80%, #3d2008 100%); }
+    .periodo-bar { background: #f9f4ee; padding: 10px 32px; display: flex; gap: 32px; border-bottom: 1px solid #e0d4c4; }
+    .periodo-bar .pb-item { display: flex; flex-direction: column; }
+    .periodo-bar .pb-label { font-size: 8px; font-weight: 700; color: #999; letter-spacing: 1px; text-transform: uppercase; }
+    .periodo-bar .pb-val   { font-size: 11px; font-weight: 700; color: #2c1810; margin-top: 1px; }
+    .emp-section { padding: 18px 32px; border-bottom: 2px solid #e8ddd0; display: flex; align-items: center; gap: 16px; }
+    .emp-avatar { width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #5c3d1e, #8b5e34);
+                  display: flex; align-items: center; justify-content: center;
+                  font-size: 20px; font-weight: 800; color: #fff; flex-shrink: 0; border: 3px solid #c8a06a; }
+    .emp-data { flex: 1; }
+    .emp-data .emp-name   { font-size: 16px; font-weight: 800; color: #1a1a1a; }
+    .emp-data .emp-sub    { display: flex; gap: 18px; margin-top: 5px; flex-wrap: wrap; }
+    .emp-data .emp-sub span { font-size: 10px; color: #777; font-weight: 500; }
+    .emp-data .emp-sub span strong { color: #3d2008; font-weight: 700; }
+    .body-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-bottom: 1px solid #e8ddd0; }
+    .col { padding: 20px 24px; }
+    .col-left { border-right: 1px solid #e8ddd0; }
+    .sec-title { font-size: 8px; font-weight: 800; color: #c8a06a; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #e8ddd0; }
+    table { width: 100%; border-collapse: collapse; }
+    tr.normal td { padding: 5px 0; font-size: 10px; border-bottom: 1px solid #f0e8de; color: #3d2008; }
+    tr.normal td:last-child { text-align: right; font-weight: 600; }
+    tr.sub td { padding: 6px 0; font-size: 10px; background: #f9f4ee; font-weight: 700; color: #2c1810; border-top: 1px solid #d4c5b0; border-bottom: 1px solid #d4c5b0; }
+    tr.sub td:last-child { text-align: right; }
+    tr.accent td { padding: 7px 8px; font-size: 10px; background: #7b5c3e; color: #fdf8f4; font-weight: 700; }
+    tr.accent td:last-child { text-align: right; }
+    tr.deduct td { padding: 5px 0; font-size: 10px; color: #8b2020; border-bottom: 1px solid #f8e8e8; }
+    tr.deduct td:last-child { text-align: right; font-weight: 600; }
+    tr.total td { padding: 8px 8px; font-size: 11px; background: #2c1810; color: #fff; font-weight: 800; }
+    tr.total td:last-child { text-align: right; }
+    .neto-box { background: #2c1810; padding: 18px 32px; display: flex; justify-content: space-between; align-items: center; }
+    .neto-label { font-size: 11px; font-weight: 700; color: #c8a06a; letter-spacing: 1px; text-transform: uppercase; }
+    .neto-sub { font-size: 9px; color: rgba(255,255,255,0.5); margin-top: 3px; }
+    .neto-amount { font-size: 26px; font-weight: 800; color: #fff; }
+    .nota { padding: 12px 32px; font-size: 8px; color: #999; line-height: 1.6; border-top: 1px solid #f0e8de; font-style: italic; }
+    .ftr { padding: 16px 32px; display: flex; justify-content: space-between; align-items: flex-end; background: #faf7f3; border-top: 2px solid #e8ddd0; }
+    .sig-space { height: 32px; }
+    .sig-line { border-top: 1.5px solid #2c1810; width: 160px; margin-bottom: 4px; }
+    .sig-name { font-size: 9px; font-weight: 700; color: #2c1810; }
+    .sig-cargo { font-size: 8px; color: #999; margin-top: 1px; }
+    .ftr-right { text-align: right; font-size: 9px; color: #777; line-height: 1.8; }
+    .ftr-right strong { color: #2c1810; font-size: 10px; }
+    .watermark { display: none; }
+    @media print { .slip-wrapper { padding: 0; } body { background: #fff; } }
+  `;
+
+  const combinedHtml = `<!DOCTYPE html><html lang="es"><head>
+  <meta charset="UTF-8">
+  <title>Planilla de Comprobantes \u2013 ${ql}</title>
+  <style>${css}</style>
+</head><body>
+${slipBodies.map(body => `<div class="slip-wrapper">${body}</div>`).join("")}
+<script>window.onload = () => window.print();<\/script>
+</body></html>`;
+
+  const blob = new Blob([combinedHtml], { type: "text/html;charset=utf-8" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+// ─── Excel Export ──────────────────────────────────────────────────────────────
+function exportToExcel(records, slipType, filterQuincena) {
+  const st = SLIP_TYPES[slipType];
+  const toExport = filterQuincena ? records.filter(r => r.quincena === filterQuincena) : records;
+  const wb = XLSX.utils.book_new();
+  const byQ = {};
+  toExport.forEach(r => { if (!byQ[r.quincena]) byQ[r.quincena] = []; byQ[r.quincena].push(r); });
+
+  // ── Paleta de colores ──────────────────────────────────────────────────────
+  const C = {
+    headerBg:   "2C1810",   // café oscuro
+    headerFg:   "FFFFFF",
+    subBg:      "5C3D1E",   // café medio
+    subFg:      "F5E6C8",   // crema
+    accentBg:   "C8A06A",   // dorado
+    accentFg:   "1A1A1A",
+    colBg:      "F9F4EE",   // crema claro
+    colFg:      "2C1810",
+    deductFg:   "8B2020",   // rojo oscuro
+    totBg:      "2C1810",
+    totFg:      "FFFFFF",
+    evenBg:     "FDFAF5",
+    border:     "D5C5A8",
+  };
+
+  const font     = (bold, color, sz=10) => ({ name:"Calibri", bold, color:{rgb:color}, sz });
+  const fill     = bg => ({ type:"pattern", pattern:"solid", fgColor:{rgb:bg} });
+  const border   = () => ({ top:{style:"thin",color:{rgb:C.border}}, bottom:{style:"thin",color:{rgb:C.border}}, left:{style:"thin",color:{rgb:C.border}}, right:{style:"thin",color:{rgb:C.border}} });
+  const alignL   = () => ({ horizontal:"left",  vertical:"center", wrapText:false });
+  const alignR   = () => ({ horizontal:"right", vertical:"center" });
+  const alignC   = () => ({ horizontal:"center",vertical:"center" });
+  const money    = v => typeof v === "number" ? Math.round(v*100)/100 : v;
+
+  const cellStyle = (bold, fgColor, bgColor, align, fmt) => ({
+    font: font(bold, fgColor),
+    fill: fill(bgColor),
+    border: border(),
+    alignment: align(),
+    numFmt: fmt || "@",
+  });
+
+  const applyStyle = (ws, addr, style) => {
+    if (!ws[addr]) ws[addr] = { t:"z", v:"" };
+    ws[addr].s = style;
+  };
+
+  Object.keys(byQ).sort().reverse().forEach(q => {
+    const ql    = QUINCENAS.find(x => x.value === q)?.label || q;
+    const rows  = byQ[q];
+    const empresa = slipType === "montecarlo"
+      ? "Condominio Montecarlo · Jacó, Puntarenas"
+      : "Jaco Beach Onsite Management Services Ltda.";
+
+    // ── Definición de columnas por tipo ──────────────────────────────────────
+    let headers, dataRows, colWidths;
+
+    if (slipType === "jaco_oficina") {
+      headers   = ["Nombre","Puesto","Sal. Mensual","Sal. Quincenal","Com. Rentas","Com. Tours y Transfer","Monto Final c/ Comisiones","Día Dobles","Cargas Sociales (10.83%)","Impuesto Renta","Salario Neto"];
+      dataRows  = rows.map(r => {
+        const c = st.calcNet(r);
+        return [r.nombre||"", r.puesto||"",
+          money(c.brutoMensual), money(c.brutoQuincenal),
+          money(r.rentas||0), money(r.toursTransfers||0),
+          money(c.montoFinalConComisiones), money(c.diasDobles),
+          money(c.cargasSociales), money(c.impuestos), money(c.neto)];
+      });
+      colWidths = [28,14,20,16,16,14,20,22,12,22,15,16];
+    } else if (slipType === "jaco_otros") {
+      headers   = ["Nombre","Puesto","Sal. Mensual","Sal. Quincenal","Días Laborados","Días Pendientes","Días Dobles","Monto Final","Cargas Sociales (10.83%)","Salario Neto"];
+      dataRows  = rows.map(r => {
+        const c = st.calcNet(r);
+        return [r.nombre||"", r.puesto||"",
+          money(c.brutoMensual), money(c.brutoQuincenal),
+          r.diasLaborados||15, money(c.diasPendientes),
+          money(c.diasDobles), money(c.montoFinal),
+          money(c.cargasSociales), money(c.neto)];
+      });
+      colWidths = [28,14,20,16,16,14,16,12,16,22,16];
+    } else {
+      headers   = ["Nombre","Puesto","Sal. Mensual","Sal. Quincenal","Horas Extra","Días Dobles","Días Libre Pendiente","Monto Final c/ Extras","Cargas Sociales (10.83%)","Salario Neto"];
+      dataRows  = rows.map(r => {
+        const c = st.calcNet(r);
+        return [r.nombre||"", r.puesto||"",
+          money(c.brutoMensual), money(c.brutoQuincenal),
+          money(c.horasExtra), money(c.diasDobles),
+          money(c.diasLibre), money(c.montoFinalConExtras),
+          money(c.cargasSociales), money(c.neto)];
+      });
+      colWidths = [28,14,20,16,16,12,12,18,20,22,16];
+    }
+
+    const nCols   = headers.length;
+    const neto_idx = nCols - 1;
+
+    // ── Construir AOA ─────────────────────────────────────────────────────────
+    // Fila 1: título empresa  (merge A1:last)
+    // Fila 2: subtítulo tipo + quincena
+    // Fila 3: vacía
+    // Fila 4: encabezados
+    // Fila 5+: datos
+    // última: totales
+
+    const aoa = [];
+    aoa.push([empresa, ...Array(nCols-1).fill(null)]);                          // row 0 → fila 1
+    aoa.push(["Planilla de Salarios  –  " + st.label + "  |  " + ql,
+              ...Array(nCols-1).fill(null)]);                                    // row 1 → fila 2
+    aoa.push(Array(nCols).fill(null));                                           // row 2 → fila 3 vacía
+    aoa.push(headers);                                                           // row 3 → fila 4 encabezados
+    dataRows.forEach(dr => aoa.push(dr));                                        // rows 4+ datos
+    aoa.push(Array(nCols).fill(null));                                           // fila vacía antes de totales
+
+    // Totales
+    const totRow = Array(nCols).fill(null);
+    totRow[0]         = "TOTALES";
+    // suma columnas numéricas (índice 3 en adelante)
+    for (let ci = 3; ci < nCols; ci++) {
+      totRow[ci] = dataRows.reduce((s, dr) => s + (typeof dr[ci]==="number" ? dr[ci] : 0), 0);
+    }
+    aoa.push(totRow);
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+    // ── Anchos de columna ─────────────────────────────────────────────────────
+    ws["!cols"] = colWidths.map(w => ({ wch: w }));
+
+    // ── Alturas de fila ───────────────────────────────────────────────────────
+    ws["!rows"] = [];
+    ws["!rows"][0] = { hpt: 22 };
+    ws["!rows"][1] = { hpt: 18 };
+    ws["!rows"][3] = { hpt: 20 };
+
+    // ── Merges ────────────────────────────────────────────────────────────────
+    ws["!merges"] = [
+      { s:{r:0,c:0}, e:{r:0,c:nCols-1} },
+      { s:{r:1,c:0}, e:{r:1,c:nCols-1} },
+    ];
+
+    // ── Helper para dirección de celda ────────────────────────────────────────
+    const addr = (r,c) => XLSX.utils.encode_cell({r,c});
+
+    // ── Estilos fila 1 (empresa) ──────────────────────────────────────────────
+    ws[addr(0,0)].s = { font:font(true,C.headerFg,13), fill:fill(C.headerBg),
+                        alignment:{horizontal:"center",vertical:"center"},
+                        border:border() };
+
+    // ── Estilos fila 2 (subtítulo) ────────────────────────────────────────────
+    ws[addr(1,0)].s = { font:font(true,C.subFg,11), fill:fill(C.subBg),
+                        alignment:{horizontal:"center",vertical:"center"},
+                        border:border() };
+
+    // ── Estilos encabezados (fila 4, índice 3) ────────────────────────────────
+    for (let ci = 0; ci < nCols; ci++) {
+      const a = addr(3,ci);
+      if (!ws[a]) ws[a] = {t:"s", v:""};
+      ws[a].s = { font:font(true,C.colFg,10), fill:fill(C.colBg),
+                  alignment:{horizontal:"center",vertical:"center",wrapText:true},
+                  border:border() };
+    }
+
+    // ── Estilos filas de datos ────────────────────────────────────────────────
+    const moneyFmt = '₡#,##0.00';
+    dataRows.forEach((dr, ri) => {
+      const rowIdx = 4 + ri;
+      const isEven = ri % 2 === 1;
+      const bgData = isEven ? C.evenBg : "FFFFFF";
+      for (let ci = 0; ci < nCols; ci++) {
+        const a = addr(rowIdx, ci);
+        if (!ws[a]) ws[a] = {t:"s", v:""};
+        const isNum    = ci >= 3;
+        const isNeto   = ci === neto_idx;
+        const isDeduct = (slipType==="jaco_oficina" && (ci===9||ci===10));
+        ws[a].s = {
+          font: font(isNeto, isDeduct ? C.deductFg : isNeto ? C.headerFg : "1A1A1A", 10),
+          fill: fill(isNeto ? C.headerBg : bgData),
+          alignment: isNum ? alignR() : alignL(),
+          border: border(),
+          numFmt: isNum ? moneyFmt : "@",
+        };
+        if (isNum && typeof dr[ci] === "number") ws[a].t = "n";
+      }
+    });
+
+    // ── Fila vacía entre datos y totales ──────────────────────────────────────
+    const sepIdx = 4 + dataRows.length;
+    for (let ci = 0; ci < nCols; ci++) {
+      const a = addr(sepIdx, ci);
+      if (!ws[a]) ws[a] = {t:"s",v:""};
+      ws[a].s = { fill:fill("F0E8D8"), border:border() };
+    }
+
+    // ── Estilos fila TOTALES ──────────────────────────────────────────────────
+    const totIdx = 4 + dataRows.length + 1;
+    ws["!rows"][totIdx] = { hpt: 20 };
+    for (let ci = 0; ci < nCols; ci++) {
+      const a = addr(totIdx, ci);
+      if (!ws[a]) ws[a] = {t:"s",v:""};
+      const isNum = ci >= 3;
+      ws[a].s = {
+        font: font(true, C.totFg, 11),
+        fill: fill(C.totBg),
+        alignment: isNum ? alignR() : (ci===0 ? alignL() : alignC()),
+        border: border(),
+        numFmt: isNum ? moneyFmt : "@",
+      };
+      if (isNum && typeof totRow[ci]==="number") ws[a].t = "n";
+    }
+
+    XLSX.utils.book_append_sheet(wb, ws, ql.substring(0,31));
+  });
+
+  XLSX.writeFile(wb, `Planilla_${st.label.replace(/\s/g,"_")}_${filterQuincena||"completa"}.xlsx`);
+}
+
+// ─── Form Panel ────────────────────────────────────────────────────────────────
+function FormPanel({ slipType, onSaved }) {
+  const st = SLIP_TYPES[slipType];
+  const [form, setForm] = useState({ diasLaborados: 15 });
+  const [quincena, setQuincena] = useState(QUINCENAS[0]?.value || "");
+  const [fechaPago, setFechaPago] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
+  const calc = st.calcNet(form);
+
+  const COLOR = { jaco_oficina: "#1a3a5c", jaco_otros: "#1a3a5c", montecarlo: "#1c1c1c" };
+  const ACCENT = "#c8a84b";
+  const color = COLOR[slipType];
+
+  const inputStyle = { width:"100%", padding:"9px 12px", border:"1px solid #ddd", borderRadius:6, fontFamily:"inherit", fontSize:14, fontWeight:700, background:"#fafafa", boxSizing:"border-box", outline:"none" };
+  const labelStyle = { fontSize:11, fontWeight:700, letterSpacing:"0.5px", color:"#666", display:"block", marginBottom:4, textTransform:"uppercase" };
+
+  const handleSave = async () => {
+    if (!form.nombre) { setMsg("⚠ Ingrese nombre del empleado"); return; }
+    setSaving(true);
+    const record = { ...form, quincena, fechaPago, slipType, savedAt: new Date().toISOString() };
+    const ok = await saveRecord(`${st.prefix}_${slipType}`, record);
+    setSaving(false);
+    if (ok) { setMsg("✓ Guardado"); onSaved(); setTimeout(() => setMsg(""), 3000); }
+    else setMsg("✗ Error al guardar");
+  };
+
+  return (
+    <div style={{ display:"grid", gridTemplateColumns:"minmax(0,1fr) 280px", gap:20, alignItems:"start" }}>
+      <div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:14 }}>
+          <div style={{ gridColumn:"1/-1" }}>
+            <label style={labelStyle}>Quincena</label>
+            <select value={quincena} onChange={e => setQuincena(e.target.value)} style={inputStyle}>
+              {QUINCENAS.map(q => <option key={q.value} value={q.value}>{q.label}</option>)}
+            </select>
+          </div>
+          <div style={{ gridColumn:"1/-1" }}>
+            <label style={labelStyle}>Nombre del Empleado</label>
+            <select value={form.nombre||""} onChange={e => {
+                const lista = slipType === "montecarlo" ? EMPLEADOS_MONTECARLO : EMPLEADOS_JACO;
+                const emp = lista.find(x => x.nombre === e.target.value);
+                set("nombre", e.target.value);
+                  }} style={inputStyle}>
+              <option value="">— Seleccione empleado —</option>
+              {(slipType === "montecarlo" ? EMPLEADOS_MONTECARLO : EMPLEADOS_JACO).map(n => (
+                <option key={n.nombre} value={n.nombre}>{n.nombre}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+          </div>
+          <div>
+            <label style={labelStyle}>Posición</label>
+            <select value={form.puesto||""} onChange={e => set("puesto",e.target.value)} style={inputStyle}>
+              <option value="">— Seleccione —</option>
+              <option value="Limpieza">Limpieza</option>
+              <option value="Mantenimiento">Mantenimiento</option>
+              <option value="Seguridad">Seguridad</option>
+              <option value="Asistente Administrativa">Asistente Administrativa</option>
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Fecha de Pago</label>
+            <input type="date" value={fechaPago} onChange={e => setFechaPago(e.target.value)} style={inputStyle} />
+          </div>
+          {st.fields.map(f => (
+            <div key={f.key}>
+              <label style={labelStyle}>{f.label}</label>
+              <input type={f.type} value={form[f.key] ?? (f.default !== undefined ? f.default : "")}
+                onChange={e => set(f.key, f.type==="number" ? (e.target.value === "" ? "" : parseFloat(e.target.value) || 0) : e.target.value)}
+                onFocus={f.type==="number" ? (e => { if (e.target.value === "0") set(f.key, "") }) : undefined}
+                placeholder={f.type==="number"?"0":""} style={inputStyle} />
+            </div>
+          ))}
+        </div>
+        <button onClick={handleSave} disabled={saving} style={{ background:color, color:"white", border:"none", padding:"12px 28px", fontSize:13, fontWeight:700, borderRadius:6, cursor:"pointer", marginRight:10, textTransform:"uppercase", letterSpacing:"1px" }}>
+          {saving?"Guardando...":"Guardar"}
+        </button>
+        <button onClick={() => printSlip({...form, quincena, fechaPago}, slipType)} style={{ background:"white", color:color, border:`2px solid ${color}`, padding:"11px 24px", fontSize:13, fontWeight:700, borderRadius:6, cursor:"pointer", textTransform:"uppercase", letterSpacing:"1px" }}>
+          🖨 Vista Previa / Imprimir
+        </button>
+        <button onClick={() => saveSlip({...form, quincena, fechaPago}, slipType)} style={{ background:"#5c3d1e", color:"white", border:"none", padding:"12px 24px", fontSize:13, fontWeight:700, borderRadius:6, cursor:"pointer", textTransform:"uppercase", letterSpacing:"1px" }}>
+          💾 Guardar Comprobante
+        </button>
+        {msg && <div style={{ marginTop:12, fontSize:13, color:msg.startsWith("✓")?"#27ae60":"#c0392b" }}>{msg}</div>}
+      </div>
+
+      {/* Live preview card */}
+      <div style={{ background:"white", borderRadius:10, padding:20, border:"1px solid #e5e5e5", borderTop:`4px solid ${ACCENT}`, height:"fit-content" }}>
+        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"1.5px", color:ACCENT, marginBottom:12 }}>PREVIEW</div>
+        <div style={{ fontSize:15, fontWeight:700, color:color, marginBottom:2 }}>{form.nombre||"—"}</div>
+        <div style={{ fontSize:11, color:"#aaa", marginBottom:16 }}>{form.puesto||""}</div>
+        {slipType==="jaco_oficina" && <>
+          <PreviewRow label="Bruto Quincenal" val={fmt(calc.brutoQuincenal)} />
+          <PreviewRow label="+ Comisiones" val={fmt(calc.comisiones)} />
+          <PreviewRow label="− Cargas Soc." val={fmt(calc.cargasSociales)} neg />
+        </>}
+        {slipType==="jaco_otros" && <>
+          <PreviewRow label="Bruto Quincenal" val={fmt(calc.brutoQuincenal)} />
+          <PreviewRow label="Días Dobles" val={fmt(calc.diasDobles)} />
+          <PreviewRow label="− Cargas Soc." val={fmt(calc.cargasSociales)} neg />
+        </>}
+        {slipType==="montecarlo" && <>
+          <PreviewRow label="Bruto Quincenal" val={fmt(calc.brutoQuincenal)} />
+          <PreviewRow label="Horas Extra" val={fmt(calc.horasExtra)} />
+          <PreviewRow label="− Cargas Soc." val={fmt(calc.cargasSociales)} neg />
+        </>}
+        <div style={{ borderTop:`2px solid ${color}`, marginTop:10, paddingTop:10, display:"flex", justifyContent:"space-between", fontSize:17, fontWeight:800, color:color }}>
+          <span>NETO</span><span>{fmt(calc.neto)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PreviewRow({ label, val, neg }) {
+  return (
+    <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, marginBottom:7, color: neg?"#c0392b":"#555" }}>
+      <span>{label}</span><span style={{ fontWeight:700 }}>{val}</span>
+    </div>
+  );
+}
+
+// ─── History Panel ─────────────────────────────────────────────────────────────
+function HistoryPanel({ slipType, refresh }) {
+  const st = SLIP_TYPES[slipType];
+  const COLOR = { jaco_oficina:"#1a3a5c", jaco_otros:"#1a3a5c", montecarlo:"#1c1c1c" };
+  const color = COLOR[slipType];
+  const [records, setRecords] = useState([]);
+  const [filter, setFilter] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    loadAllRecords(`${st.prefix}_${slipType}`).then(r => { setRecords(r); setLoading(false); });
+  }, [slipType, refresh]);
+
+  const filtered = filter ? records.filter(r => r.quincena === filter) : records;
+  const quincenasPresentes = [...new Set(records.map(r => r.quincena))].sort().reverse();
+
+  if (loading) return <div style={{ padding:40, textAlign:"center", color:"#aaa" }}>Cargando...</div>;
+
+  return (
+    <div>
+      <div style={{ display:"flex", gap:12, marginBottom:20, alignItems:"center", flexWrap:"wrap" }}>
+        <div style={{ fontSize:14, fontWeight:700, color:"#555" }}>Filtrar quincena:</div>
+        <select value={filter} onChange={e => setFilter(e.target.value)} style={{ padding:"8px 12px", border:"1px solid #ddd", borderRadius:6, fontSize:14, fontFamily:"inherit", fontWeight:700 }}>
+          <option value="">— Todas —</option>
+          {quincenasPresentes.map(q => <option key={q} value={q}>{QUINCENAS.find(x=>x.value===q)?.label||q}</option>)}
+        </select>
+        <span style={{ fontSize:12, color:"#aaa" }}>{filtered.length} registro(s)</span>
+        <div style={{ marginLeft:"auto", display:"flex", gap:8 }}>
+          <button onClick={() => saveAllSlips(filtered, slipType, filter||null)} disabled={filtered.length===0}
+            style={{ background:filtered.length===0?"#e5e5e5":"#5c3d1e", color:filtered.length===0?"#aaa":"white", border:"none", padding:"9px 18px", borderRadius:6, fontSize:13, fontWeight:700, cursor:filtered.length===0?"not-allowed":"pointer" }}>
+            💾 Guardar todos ({filtered.length})
+          </button>
+          <button onClick={() => exportToExcel(records, slipType, filter||null)} disabled={filtered.length===0}
+            style={{ background:filtered.length===0?"#e5e5e5":"#1d6f42", color:filtered.length===0?"#aaa":"white", border:"none", padding:"9px 18px", borderRadius:6, fontSize:13, fontWeight:700, cursor:filtered.length===0?"not-allowed":"pointer" }}>
+            📊 Exportar a Excel
+          </button>
+        </div>
+      </div>
+      {filtered.length===0
+        ? <div style={{ padding:40, textAlign:"center", color:"#bbb", fontSize:14 }}>No hay comprobantes guardados.</div>
+        : <div style={{ display:"grid", gap:12 }}>
+          {filtered.map((r,i) => {
+            const calc = st.calcNet(r);
+            const ql = QUINCENAS.find(q=>q.value===r.quincena)?.label||r.quincena;
+            return (
+              <div key={i} style={{ background:"white", border:"1px solid #e5e5e5", borderRadius:8, padding:"14px 18px", display:"flex", alignItems:"center", gap:16 }}>
+                <div style={{ width:4, alignSelf:"stretch", borderRadius:4, background:"#c8a84b", flexShrink:0 }} />
+                <div style={{ flex:1 }}>
+                  <div style={{ fontWeight:700, fontSize:15, color }}>{r.nombre}</div>
+                  <div style={{ fontSize:11, color:"#aaa", marginTop:2 }}>{r.puesto||""} · {ql}</div>
+                </div>
+                <div style={{ textAlign:"right" }}>
+                  <div style={{ fontSize:18, fontWeight:800, color }}>{fmt(calc.neto)}</div>
+                  <div style={{ fontSize:11, color:"#aaa" }}>{r.fechaPago||"—"}</div>
+                </div>
+                <div style={{ display:"flex", gap:8, flexShrink:0 }}>
+                  <button onClick={() => printSlip(r, slipType)} style={{ background:color, color:"white", border:"none", padding:"8px 14px", borderRadius:6, fontSize:12, fontWeight:700, cursor:"pointer" }}>🖨 Imprimir</button>
+                  <button onClick={() => saveSlip(r, slipType)} style={{ background:"#5c3d1e", color:"white", border:"none", padding:"8px 14px", borderRadius:6, fontSize:12, fontWeight:700, cursor:"pointer" }}>💾 Guardar</button>
+                  <button onClick={async () => { await deleteRecord(`${st.prefix}_${slipType}`, r.quincena, r.nombre); setRecords(p => p.filter((_,j)=>j!==i)); }}
+                    style={{ background:"#fee2e2", color:"#c0392b", border:"none", padding:"8px 14px", borderRadius:6, fontSize:12, fontWeight:700, cursor:"pointer" }}>✕</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>}
+    </div>
+  );
+}
+
+// ─── Tab Button ────────────────────────────────────────────────────────────────
+function TabBtn({ active, onClick, children, color, accent }) {
+  return (
+    <button onClick={onClick} style={{ padding:"10px 20px", fontFamily:"inherit", fontSize:13, fontWeight:700, letterSpacing:"0.5px", cursor:"pointer", border:"none", background:active?color:"#e8e8e5", color:active?"white":"#555", borderBottom:active?`3px solid ${accent}`:"3px solid transparent", transition:"all 0.2s" }}>
+      {children}
+    </button>
+  );
+}
+
+// ─── App ───────────────────────────────────────────────────────────────────────
+function App() {
+  const [slipType, setSlipType] = useState("jaco_oficina");
+  const [tab, setTab] = useState("form");
+  const [histRefresh, setHistRefresh] = useState(0);
+
+  const COLOR = { jaco_oficina:"#1a3a5c", jaco_otros:"#1a3a5c", montecarlo:"#1c1c1c" };
+  const ACCENT = "#c8a84b";
+  const color = COLOR[slipType];
+
+  const TABS = [
+    { key:"jaco_oficina",  label:"JACO BEACH · OFICINA" },
+    { key:"jaco_otros",    label:"JACO BEACH · OTROS PUESTOS" },
+    { key:"montecarlo",    label:"MONTE CARLO" },
+  ];
+
+  return (
+    <div style={{ minHeight:"100vh", background:"#f0efe9", fontFamily:"'Poppins', sans-serif" }}>
+      <style>{}</style>
+      {/* Header */}
+      <div style={{ background:color, padding:"18px 32px", display:"flex", alignItems:"center", gap:16, boxShadow:"0 2px 12px rgba(0,0,0,0.15)" }}>
+        <div style={{ width:40, height:40, borderRadius:8, background:ACCENT, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, fontWeight:900, color }}>₡</div>
+        <div>
+          <div style={{ color:"white", fontSize:18, fontWeight:700 }}>Comprobantes de Pago de Salario</div>
+          <div style={{ color:"rgba(255,255,255,0.55)", fontSize:12 }}>Sistema de Planilla · Beatriz · Administrative Accounting</div>
+        </div>
+      </div>
+
+      {/* Company/Type tabs */}
+      <div style={{ background:"#e8e8e5", display:"flex", paddingLeft:32, gap:2 }}>
+        {TABS.map(t => <TabBtn key={t.key} active={slipType===t.key} onClick={() => { setSlipType(t.key); setTab("form"); }} color={color} accent={ACCENT}>{t.label}</TabBtn>)}
+      </div>
+
+      {/* Content */}
+      <div style={{ maxWidth:1100, margin:"0 auto", padding:"24px 28px" }}>
+        <div style={{ display:"flex", gap:8, marginBottom:24 }}>
+          {["form","history"].map(t => (
+            <button key={t} onClick={() => { setTab(t); if (t==="history") setHistRefresh(p=>p+1); }}
+              style={{ padding:"8px 18px", fontSize:12, fontWeight:700, letterSpacing:"1px", textTransform:"uppercase", border:"none", borderRadius:20, cursor:"pointer", background:tab===t?ACCENT:"white", color:tab===t?color:"#888", boxShadow:tab===t?"0 2px 8px rgba(0,0,0,0.12)":"none" }}>
+              {t==="form"?"➕ Nuevo Comprobante":"📂 Historial"}
+            </button>
+          ))}
+        </div>
+        <div style={{ background:"#fafaf8", borderRadius:12, padding:"24px 22px", boxShadow:"0 1px 8px rgba(0,0,0,0.06)" }}>
+          {tab==="form"
+            ? <FormPanel key={slipType} slipType={slipType} onSaved={() => setHistRefresh(p=>p+1)} />
+            : <HistoryPanel slipType={slipType} refresh={histRefresh} />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
